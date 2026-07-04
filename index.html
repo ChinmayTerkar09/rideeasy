@@ -526,6 +526,27 @@ canvas{display:block;}
 
 <script>
 // ══════════════════════════════════════════════════
+// API CONFIG
+// ══════════════════════════════════════════════════
+const API_BASE = 'https://rideeasy-ten.vercel.app/api';
+let authToken = localStorage.getItem('rideeasy_token') || null;
+
+const api = async (path, method = 'GET', body = null) => {
+  const opts = {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
+    }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(API_BASE + path, opts);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
+};
+
+// ══════════════════════════════════════════════════
 // DATA
 // ══════════════════════════════════════════════════
 const vehicles = [
@@ -564,18 +585,35 @@ function switchAuthTab(tab){
   document.querySelectorAll('.auth-tab').forEach((t,i)=>t.classList.toggle('active',(tab==='login'&&i===0)||(tab==='signup'&&i===1)));
 }
 function selectRole(r){selectedRole=r;document.getElementById('roleRenter').classList.toggle('active',r==='renter');document.getElementById('roleOwner').classList.toggle('active',r==='owner');}
-function doLogin(){
+async function doLogin(){
   const email=document.getElementById('loginEmail').value.trim();
   const pass=document.getElementById('loginPassword').value;
   if(!email||!pass){showToast('⚠️ Enter email and password');return;}
-  const name=email.split('@')[0].replace(/[^a-zA-Z]/g,' ').trim()||'User';
-  loginUser({name,email,role:'renter'});
+  try {
+    showToast('⏳ Signing in...');
+    const data = await api('/auth/login','POST',{email,password:pass});
+    authToken = data.token;
+    localStorage.setItem('rideeasy_token', authToken);
+    loginUser(data.user);
+  } catch(err) {
+    showToast('❌ ' + err.message);
+  }
 }
-function doSignup(){
+async function doSignup(){
   const name=document.getElementById('signupName').value.trim();
   const email=document.getElementById('signupEmail').value.trim();
-  if(!name||!email){showToast('⚠️ Fill in name and email');return;}
-  loginUser({name,email,role:selectedRole});
+  const phone=document.getElementById('signupPhone').value.trim();
+  const password=document.getElementById('signupPassword').value;
+  if(!name||!email||!phone||!password){showToast('⚠️ Fill in all fields');return;}
+  try {
+    showToast('⏳ Creating account...');
+    const data = await api('/auth/signup','POST',{name,email,phone,password,role:selectedRole});
+    authToken = data.token;
+    localStorage.setItem('rideeasy_token', authToken);
+    loginUser(data.user);
+  } catch(err) {
+    showToast('❌ ' + err.message);
+  }
 }
 function loginUser(user){
   currentUser=user;
@@ -590,6 +628,8 @@ function loginUser(user){
 }
 function doLogout(){
   currentUser=null;
+  authToken=null;
+  localStorage.removeItem('rideeasy_token');
   document.getElementById('authOverlay').classList.remove('hidden');
   document.getElementById('ownerTab').style.display='none';
   document.getElementById('navAvatar').textContent='?';
@@ -734,17 +774,26 @@ function openReview(vid){
 }
 function setRating(n){selectedRating=n;updateStarPicker(n);}
 function updateStarPicker(n){document.querySelectorAll('#starPicker span').forEach((s,i)=>s.classList.toggle('lit',i<n));}
-function submitReview(){
+async function submitReview(){
   if(!selectedRating){showToast('⚠️ Pick a star rating');return;}
   const text=document.getElementById('reviewText').value.trim();
   if(!text){showToast('⚠️ Write something about your experience');return;}
-  const v=vehicles.find(x=>x.id===reviewingVehicleId);
+  const v=vehicles.find(x=>x.id===reviewingVehicleId||x._id===reviewingVehicleId);
   if(!v)return;
-  v.reviews.unshift({author:currentUser.name,stars:selectedRating,text,date:'Just now'});
-  closeModal('reviewModal');
-  renderList();
-  if(selectedVehicle?.id===reviewingVehicleId)renderVehicleDetail();
-  showToast('⭐ Review submitted! Thank you.');
+  if(v._id) {
+    try {
+      await api(`/reviews/${v._id}`,'POST',{stars:selectedRating,text});
+      v.reviews.unshift({author:currentUser.name,stars:selectedRating,text,date:'Just now'});
+      closeModal('reviewModal'); renderList();
+      if(selectedVehicle?.id===reviewingVehicleId||selectedVehicle?._id===reviewingVehicleId)renderVehicleDetail();
+      showToast('⭐ Review submitted! Thank you.');
+    } catch(err){ showToast('❌ '+err.message); }
+  } else {
+    v.reviews.unshift({author:currentUser.name,stars:selectedRating,text,date:'Just now'});
+    closeModal('reviewModal'); renderList();
+    if(selectedVehicle?.id===reviewingVehicleId)renderVehicleDetail();
+    showToast('⭐ Review submitted! Thank you.');
+  }
 }
 
 // ══════════════════════════════════════════════════
@@ -815,7 +864,7 @@ function calcTotal(){
   document.getElementById('totalLabel').textContent=`₹${hours*selectedVehicle.price}`;
 }
 
-function confirmBooking(){
+async function confirmBooking(){
   if(!currentUser){showToast('⚠️ Please log in to book');return;}
   const name=document.getElementById('renterName')?.value?.trim();
   if(!name){showToast('⚠️ Please enter your name');return;}
@@ -823,22 +872,44 @@ function confirmBooking(){
   const rd=document.getElementById('returnDate')?.value;
   const pt=document.getElementById('pickupTime')?.value||'10:00';
   const rt=document.getElementById('returnTime')?.value||'18:00';
-  const start=new Date(`${pd}T${pt}`),end=new Date(`${rd}T${rt}`);
-  const hours=Math.max(1,Math.round((end-start)/3600000));
-  const amount=hours*selectedVehicle.price;
-  const id='RDE'+String(bookings.length+1).padStart(3,'0');
-  bookings.unshift({id,vehicle:selectedVehicle.name,renter:name,from:pd,to:rd,amount,status:'active-rental'});
-  totalRevenue+=amount;
-  const idx=vehicles.findIndex(v=>v.id===selectedVehicle.id);
-  vehicles[idx].status='rented';selectedVehicle=vehicles[idx];
-  renderList();renderDashboard();
-  // SMS modal
-  document.getElementById('smsContent').innerHTML=`
-    <p style="margin-bottom:10px;">Booking <strong>${id}</strong> confirmed for <strong>${name}</strong>!</p>
-    <p>Vehicle: ${selectedVehicle.name}<br>From: ${pd} ${pt}<br>To: ${rd} ${rt}<br><strong>Total: ₹${amount}</strong></p>
-    <p style="margin-top:10px;color:var(--bike);font-weight:600;">An SMS would be sent to your registered number in production.</p>`;
-  openModal('smsModal');
-  showPage('dashboard');
+  const location=document.getElementById('pickupLoc')?.value||'';
+  const paymentMethod=document.querySelector('.pay-method.active')?.textContent||'Cash';
+
+  // If vehicle has a real MongoDB _id use it, else fall back to local mock
+  if(selectedVehicle._id) {
+    try {
+      showToast('⏳ Confirming booking...');
+      const booking = await api('/bookings','POST',{
+        vehicleId: selectedVehicle._id,
+        pickupDate: pd, returnDate: rd,
+        pickupTime: pt, returnTime: rt,
+        location, paymentMethod
+      });
+      const start=new Date(`${pd}T${pt}`),end=new Date(`${rd}T${rt}`);
+      const hours=Math.max(1,Math.round((end-start)/3600000));
+      const amount=hours*selectedVehicle.price;
+      totalRevenue+=amount;
+      const idx=vehicles.findIndex(v=>v._id===selectedVehicle._id||v.id===selectedVehicle.id);
+      vehicles[idx].status='rented'; selectedVehicle=vehicles[idx];
+      bookings.unshift({id:booking._id.slice(-6).toUpperCase(),vehicle:selectedVehicle.name,renter:name,from:pd,to:rd,amount,status:'active-rental'});
+      renderList();renderDashboard();
+      document.getElementById('smsContent').innerHTML=`<p>Booking confirmed for <strong>${name}</strong>!<br>Vehicle: ${selectedVehicle.name}<br>From: ${pd} ${pt} → ${rd} ${rt}<br><strong>Total: ₹${amount}</strong></p><p style="margin-top:10px;color:var(--bike);font-weight:600;">SMS sent to your registered number!</p>`;
+      openModal('smsModal'); showPage('dashboard');
+    } catch(err) { showToast('❌ ' + err.message); }
+  } else {
+    // Local mock fallback for seeded vehicles
+    const start=new Date(`${pd}T${pt}`),end=new Date(`${rd}T${rt}`);
+    const hours=Math.max(1,Math.round((end-start)/3600000));
+    const amount=hours*selectedVehicle.price;
+    const id='RDE'+String(bookings.length+1).padStart(3,'0');
+    bookings.unshift({id,vehicle:selectedVehicle.name,renter:name,from:pd,to:rd,amount,status:'active-rental'});
+    totalRevenue+=amount;
+    const idx=vehicles.findIndex(v=>v.id===selectedVehicle.id);
+    vehicles[idx].status='rented';selectedVehicle=vehicles[idx];
+    renderList();renderDashboard();
+    document.getElementById('smsContent').innerHTML=`<p>Booking <strong>${id}</strong> confirmed for <strong>${name}</strong>!<br>Vehicle: ${selectedVehicle.name}<br><strong>Total: ₹${amount}</strong></p>`;
+    openModal('smsModal'); showPage('dashboard');
+  }
 }
 
 // ══════════════════════════════════════════════════
@@ -1064,6 +1135,23 @@ function submitRegistration(){
     photos:uploadedPhotos.slice(),reviews:[],
     ownerEmail:currentUser?.email
   };
+  // Try real API first if logged in as owner
+  if(currentUser?.role==='owner') {
+    try {
+      showToast('⏳ Submitting vehicle...');
+      const created = await api('/vehicles','POST',{
+        type, name, model: document.getElementById('regModel').value||'Personal Vehicle',
+        year, buyDate: document.getElementById('regBuyDate').value||null,
+        fuel, seats: parseInt(document.getElementById('regSeats').value)||(type==='car'?5:1),
+        kmDriven: km, desc: document.getElementById('regDesc').value||'',
+        photos: uploadedPhotos.slice(), pricePerHour: price,
+        pricePerDay: parseInt(document.getElementById('regDayPrice').value)||price*20
+      });
+      newV._id = created._id;
+    } catch(err) {
+      showToast('⚠️ API save failed, added locally: '+err.message);
+    }
+  }
   vehicles.push(newV);
   renderList();renderDashboard();
   showToast(`🎉 ${name} listed! Visible in fleet.`);
@@ -1153,7 +1241,33 @@ function showToast(msg){
 // ══════════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════════
-renderList();renderDashboard();renderPhotos();
+async function init() {
+  renderList(); renderDashboard(); renderPhotos();
+  // Auto-login if token exists
+  if(authToken) {
+    try {
+      const user = await api('/auth/me');
+      loginUser(user);
+    } catch(e) {
+      authToken=null; localStorage.removeItem('rideeasy_token');
+    }
+  }
+  // Load vehicles from API and merge with local
+  try {
+    const apiVehicles = await api('/vehicles');
+    if(apiVehicles.length > 0) {
+      // Map API vehicles to frontend format and prepend
+      const mapped = apiVehicles.map(v => ({
+        ...v, id: v._id, price: v.pricePerHour, km: v.kmDriven,
+        icon: v.fuel==='Electric'?'⚡':v.type==='bike'?'🏍️':'🚗',
+        reviews: [], photos: v.photos||[]
+      }));
+      vehicles.unshift(...mapped);
+      renderList(); renderDashboard();
+    }
+  } catch(e) { /* API not reachable, use local data */ }
+}
+init();
 </script>
 </body>
 </html>
