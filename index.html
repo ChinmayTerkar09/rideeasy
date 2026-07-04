@@ -1202,22 +1202,94 @@ function popupQuick(t){popupSend(t);}
 
 async function popupSend(override){
   const input=document.getElementById('popupInput');
-  const text=override||input.value.trim();if(!text)return;
-  input.value='';popupAddUser(text);chatHistory.push({role:'user',content:text});popupShowTyping();
-  const ctx=vehicles.map(v=>`${v.name}(${v.type},₹${v.price}/hr,${v.status},${v.fuel},${v.year},${v.km}km,${avgRating(v)}★)`).join('\n');
-  const sys=`You are RideEasy AI for a India bike/car rental platform. Fleet:\n${ctx}\nBookings: ${bookings.length}, Revenue: ₹${totalRevenue}. Features: browse/book vehicles, list your vehicle (needs 6 photos, AI pricing), owner dashboard, star reviews. Keep replies concise, friendly, use emojis. Guide to relevant tab for actions.`;
-  try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:300,system:sys,messages:chatHistory.slice(-10)})});
-    const data=await res.json();
+  const text=override||input.value.trim();
+  if(!text)return;
+  input.value='';
+  popupAddUser(text);
+  popupShowTyping();
+
+  // Build fresh system prompt with latest fleet data every time
+  const ctx = vehicles.map(v =>
+    `- ${v.name} (${v.type}, ₹${v.price}/hr, ${v.status}, ${v.fuel}, ${v.year}, ${(v.km/1000).toFixed(0)}k km, rating: ${avgRating(v)||'no reviews'})`
+  ).join('\n');
+
+  const availableVehicles = vehicles.filter(v=>v.status==='available').map(v=>v.name).join(', ');
+
+  const sys = `You are RideEasy AI, a smart and friendly assistant for RideEasy — a bike and car rental platform in India.
+
+Current Fleet (${vehicles.length} vehicles):
+${ctx}
+
+Available right now: ${availableVehicles}
+Active bookings: ${bookings.filter(b=>b.status==='active-rental').length}
+Total revenue: ₹${totalRevenue}
+
+App features:
+- Browse tab: view all vehicles, filter by type, see photos & reviews
+- Book tab: select dates, calculate price, choose payment method
+- List Vehicle tab: owners can list their vehicle with 6+ photos and AI pricing
+- Dashboard: live stats, revenue chart, booking history
+- Owner My Fleet tab: owners see their listed vehicles and earnings
+
+Rules:
+- Give DIFFERENT, SPECIFIC answers based on what the user asks
+- If asked about a specific vehicle, give its exact price, status, and details
+- If asked to compare, actually compare with specific numbers
+- If asked for recommendations, pick specific vehicles with reasons
+- Keep replies to 2-4 sentences, friendly tone, use relevant emojis
+- Guide users to the correct tab when they want to take action
+- Never give the same generic response twice`;
+
+  // Add user message to history
+  chatHistory.push({role:'user', content: text});
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 400,
+        system: sys,
+        messages: chatHistory.slice(-12)  // keep last 6 exchanges
+      })
+    });
+    const data = await res.json();
     popupRemoveTyping();
-    const reply=data.content?.[0]?.text||"I'm having trouble right now. Please try again!";
-    chatHistory.push({role:'assistant',content:reply});
-    const low=text.toLowerCase();
-    const qrs=low.includes('list')||low.includes('register')?['Photo requirements?','Pricing guide']:low.includes('bike')?['Book a bike','Cheapest bike?']:low.includes('car')||low.includes('suv')?['Book a car','Best SUV?']:['View fleet','List my vehicle'];
-    popupAddBot(reply,qrs);
-  }catch(e){
+
+    if(data.error) {
+      popupAddBot("Sorry, I hit an error: " + data.error.message, ['Try again']);
+      chatHistory.pop(); // remove failed message
+      return;
+    }
+
+    const reply = data.content?.[0]?.text || "I'm having trouble right now. Please try again!";
+    chatHistory.push({role:'assistant', content: reply});
+
+    // Smart context-aware quick replies
+    const low = text.toLowerCase();
+    let qrs = [];
+    if(low.includes('available') || low.includes('which')) {
+      qrs = ['Cheapest option?', 'Best EV?', 'Book now'];
+    } else if(low.includes('bike') || low.includes('motorbike')) {
+      qrs = ['Book a bike', 'Compare bikes', 'Cheapest bike?'];
+    } else if(low.includes('car') || low.includes('suv') || low.includes('sedan')) {
+      qrs = ['Book a car', 'Compare cars', 'Best SUV?'];
+    } else if(low.includes('price') || low.includes('cost') || low.includes('cheap')) {
+      qrs = ['Show all prices', 'Cheapest vehicle?', 'Daily rates?'];
+    } else if(low.includes('list') || low.includes('register') || low.includes('add')) {
+      qrs = ['How many photos?', 'How is price set?'];
+    } else if(low.includes('ev') || low.includes('electric')) {
+      qrs = ['Nexon EV details', 'RAD eBike details'];
+    } else {
+      qrs = ['Available vehicles', 'Compare prices', 'List my vehicle'];
+    }
+    popupAddBot(reply, qrs);
+
+  } catch(e) {
     popupRemoveTyping();
-    popupAddBot("Connection issue 😅 You can still browse and book using the nav tabs!",['Browse vehicles']);
+    chatHistory.pop();
+    popupAddBot("Connection issue 😅 Please try again in a moment!", ['Try again', 'Browse vehicles']);
   }
 }
 
