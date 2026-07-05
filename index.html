@@ -1133,22 +1133,16 @@ function submitRegistration(){
     photos:uploadedPhotos.slice(),reviews:[],
     ownerEmail:currentUser?.email
   };
-  // Try real API first if logged in as owner
+  // Try real API in background (non-blocking)
   if(currentUser?.role==='owner') {
-    try {
-      showToast('⏳ Submitting vehicle...');
-      const created = await api('/vehicles','POST',{
-        type, name, model: document.getElementById('regModel').value||'Personal Vehicle',
-        year, buyDate: document.getElementById('regBuyDate').value||null,
-        fuel, seats: parseInt(document.getElementById('regSeats').value)||(type==='car'?5:1),
-        kmDriven: km, desc: document.getElementById('regDesc').value||'',
-        photos: uploadedPhotos.slice(), pricePerHour: price,
-        pricePerDay: parseInt(document.getElementById('regDayPrice').value)||price*20
-      });
-      newV._id = created._id;
-    } catch(err) {
-      showToast('⚠️ API save failed, added locally: '+err.message);
-    }
+    api('/vehicles','POST',{
+      type, name, model: document.getElementById('regModel').value||'Personal Vehicle',
+      year, buyDate: document.getElementById('regBuyDate').value||null,
+      fuel, seats: parseInt(document.getElementById('regSeats').value)||(type==='car'?5:1),
+      kmDriven: km, desc: document.getElementById('regDesc').value||'',
+      photos: uploadedPhotos.slice(), pricePerHour: price,
+      pricePerDay: parseInt(document.getElementById('regDayPrice').value)||price*20
+    }).then(created => { if(created._id) newV._id = created._id; }).catch(()=>{});
   }
   vehicles.push(newV);
   renderList();renderDashboard();
