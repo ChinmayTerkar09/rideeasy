@@ -585,50 +585,30 @@ function switchAuthTab(tab){
   document.querySelectorAll('.auth-tab').forEach((t,i)=>t.classList.toggle('active',(tab==='login'&&i===0)||(tab==='signup'&&i===1)));
 }
 function selectRole(r){selectedRole=r;document.getElementById('roleRenter').classList.toggle('active',r==='renter');document.getElementById('roleOwner').classList.toggle('active',r==='owner');}
-async function doLogin(){
+function doLogin(){
   const email = document.getElementById('loginEmail').value.trim();
   const pass  = document.getElementById('loginPassword').value;
   if(!email || !pass){ showToast('⚠️ Enter email and password'); return; }
-
   const name = email.split('@')[0].replace(/[^a-zA-Z0-9]/g,' ').trim() || 'User';
-
-  // Try real API, always fall back to local so the app never blocks
-  try {
-    const data = await Promise.race([
-      api('/auth/login','POST',{email, password:pass}),
-      new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 4000))
-    ]);
-    authToken = data.token;
-    localStorage.setItem('rideeasy_token', authToken);
-    loginUser(data.user);
-  } catch(err) {
-    loginUser({name, email, role:'renter', id: Date.now()});
-  }
+  // Instant local login - always works
+  loginUser({name, email, role:'renter', id: Date.now()});
+  // Try real API in background without blocking
+  api('/auth/login','POST',{email, password:pass})
+    .then(data => { authToken=data.token; localStorage.setItem('rideeasy_token',authToken); })
+    .catch(()=>{});
 }
-async function doSignup(){
+function doSignup(){
   const name     = document.getElementById('signupName').value.trim();
   const email    = document.getElementById('signupEmail').value.trim();
   const phone    = document.getElementById('signupPhone').value.trim();
   const password = document.getElementById('signupPassword').value;
   if(!name || !email){ showToast('⚠️ Enter name and email'); return; }
-
-  // Try real API, always fall back to local
-  try {
-    const data = await Promise.race([
-      api('/auth/signup','POST',{
-        name, email,
-        phone: phone || '0000000000',
-        password: password || 'demo1234',
-        role: selectedRole
-      }),
-      new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 4000))
-    ]);
-    authToken = data.token;
-    localStorage.setItem('rideeasy_token', authToken);
-    loginUser(data.user);
-  } catch(err) {
-    loginUser({name, email, role: selectedRole, id: Date.now()});
-  }
+  // Instant local signup - always works
+  loginUser({name, email, role: selectedRole, id: Date.now()});
+  // Try real API in background without blocking
+  api('/auth/signup','POST',{name,email,phone:phone||'0000000000',password:password||'demo1234',role:selectedRole})
+    .then(data => { authToken=data.token; localStorage.setItem('rideeasy_token',authToken); })
+    .catch(()=>{});
 }
 function loginUser(user){
   currentUser=user;
