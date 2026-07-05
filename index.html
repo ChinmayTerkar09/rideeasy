@@ -1193,47 +1193,43 @@ function popupRemoveTyping(){document.getElementById('popupTyping')?.remove();}
 function popupQuick(t){popupSend(t);}
 
 async function popupSend(override){
-  const input=document.getElementById('popupInput');
-  const text=override||input.value.trim();
-  if(!text)return;
-  input.value='';
+  const input = document.getElementById('popupInput');
+  const text = (override || input.value || '').trim();
+  if(!text) return;
+  input.value = '';
   popupAddUser(text);
   popupShowTyping();
 
-  // Build fresh system prompt with latest fleet data every time
-  const ctx = vehicles.map(v =>
-    `- ${v.name} (${v.type}, ₹${v.price}/hr, ${v.status}, ${v.fuel}, ${v.year}, ${(v.km/1000).toFixed(0)}k km, rating: ${avgRating(v)||'no reviews'})`
+  // Build live fleet context
+  const fleetLines = vehicles.map(v =>
+    `• ${v.name}: ${v.type}, ₹${v.price}/hr, ${v.status}, ${v.fuel}, ${v.year}, ${(v.km/1000).toFixed(0)}k km`
   ).join('\n');
 
-  const availableVehicles = vehicles.filter(v=>v.status==='available').map(v=>v.name).join(', ');
+  const available = vehicles.filter(v => v.status==='available').map(v => `${v.name}(₹${v.price}/hr)`).join(', ');
+  const rented = vehicles.filter(v => v.status==='rented').map(v => v.name).join(', ');
 
-  const sys = `You are RideEasy AI, a smart and friendly assistant for RideEasy — a bike and car rental platform in India.
+  const systemPrompt = `You are RideEasy AI — a helpful, conversational assistant for a bike and car rental platform in India.
 
-Current Fleet (${vehicles.length} vehicles):
-${ctx}
+LIVE FLEET DATA:
+${fleetLines}
 
-Available right now: ${availableVehicles}
-Active bookings: ${bookings.filter(b=>b.status==='active-rental').length}
-Total revenue: ₹${totalRevenue}
+Available now: ${available}
+Currently rented: ${rented || 'none'}
 
-App features:
-- Browse tab: view all vehicles, filter by type, see photos & reviews
-- Book tab: select dates, calculate price, choose payment method
-- List Vehicle tab: owners can list their vehicle with 6+ photos and AI pricing
-- Dashboard: live stats, revenue chart, booking history
-- Owner My Fleet tab: owners see their listed vehicles and earnings
+INSTRUCTIONS:
+- Answer the EXACT question asked. Do not repeat generic descriptions.
+- For vehicle questions: give exact price, fuel, seats, availability.
+- For comparisons: use actual numbers side by side.
+- For recommendations: pick ONE specific vehicle and explain why.
+- For booking: guide to the Book tab, mention exact price.
+- For listing: guide to List Vehicle tab, mention 6 photos + AI pricing.
+- Keep it SHORT: max 3 sentences. Be direct.
+- Use 1-2 emojis max. Vary your responses every time.
+- NEVER start your reply the same way twice.`;
 
-Rules:
-- Give DIFFERENT, SPECIFIC answers based on what the user asks
-- If asked about a specific vehicle, give its exact price, status, and details
-- If asked to compare, actually compare with specific numbers
-- If asked for recommendations, pick specific vehicles with reasons
-- Keep replies to 2-4 sentences, friendly tone, use relevant emojis
-- Guide users to the correct tab when they want to take action
-- Never give the same generic response twice`;
-
-  // Add user message to history
+  // Keep only last 6 messages to avoid stale context
   chatHistory.push({role:'user', content: text});
+  if(chatHistory.length > 6) chatHistory = chatHistory.slice(-6);
 
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -1241,49 +1237,50 @@ Rules:
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 400,
-        system: sys,
-        messages: chatHistory.slice(-12)  // keep last 6 exchanges
+        max_tokens: 250,
+        system: systemPrompt,
+        messages: chatHistory.slice()
       })
     });
     const data = await res.json();
     popupRemoveTyping();
 
-    if(data.error) {
-      popupAddBot("Sorry, I hit an error: " + data.error.message, ['Try again']);
-      chatHistory.pop(); // remove failed message
+    if(!res.ok || data.error){
+      chatHistory.pop();
+      popupAddBot("Sorry, something went wrong. Try again! 😅", ['Try again']);
       return;
     }
 
-    const reply = data.content?.[0]?.text || "I'm having trouble right now. Please try again!";
+    const reply = data.content?.[0]?.text || "I'm not sure about that. Try asking differently!";
     chatHistory.push({role:'assistant', content: reply});
 
-    // Smart context-aware quick replies
+    // Context-aware quick replies - never repeat what was just asked
     const low = text.toLowerCase();
     let qrs = [];
-    if(low.includes('available') || low.includes('which')) {
-      qrs = ['Cheapest option?', 'Best EV?', 'Book now'];
-    } else if(low.includes('bike') || low.includes('motorbike')) {
-      qrs = ['Book a bike', 'Compare bikes', 'Cheapest bike?'];
-    } else if(low.includes('car') || low.includes('suv') || low.includes('sedan')) {
-      qrs = ['Book a car', 'Compare cars', 'Best SUV?'];
-    } else if(low.includes('price') || low.includes('cost') || low.includes('cheap')) {
-      qrs = ['Show all prices', 'Cheapest vehicle?', 'Daily rates?'];
-    } else if(low.includes('list') || low.includes('register') || low.includes('add')) {
-      qrs = ['How many photos?', 'How is price set?'];
-    } else if(low.includes('ev') || low.includes('electric')) {
-      qrs = ['Nexon EV details', 'RAD eBike details'];
+    if(low.includes('available') || low.includes('which')){
+      qrs = ['Cheapest bike?', 'Best car?'];
+    } else if(low.includes('bike')){
+      qrs = ['Compare all bikes', 'Cheapest car?'];
+    } else if(low.includes('car') || low.includes('suv')){
+      qrs = ['Compare all cars', 'Any bikes available?'];
+    } else if(low.includes('price') || low.includes('cost') || low.includes('cheap')){
+      qrs = ['Most expensive?', 'Best value for money?'];
+    } else if(low.includes('electric') || low.includes('ev')){
+      qrs = ['EV range details?', 'Cost vs petrol?'];
+    } else if(low.includes('list') || low.includes('owner')){
+      qrs = ['How many photos needed?', 'How is price decided?'];
     } else {
-      qrs = ['Available vehicles', 'Compare prices', 'List my vehicle'];
+      qrs = ['Available vehicles?', 'Cheapest option?'];
     }
     popupAddBot(reply, qrs);
 
   } catch(e) {
     popupRemoveTyping();
     chatHistory.pop();
-    popupAddBot("Connection issue 😅 Please try again in a moment!", ['Try again', 'Browse vehicles']);
+    popupAddBot("Can't connect right now 😅 Please try again!", ['Retry']);
   }
 }
+
 
 // ══════════════════════════════════════════════════
 // MODAL HELPERS
