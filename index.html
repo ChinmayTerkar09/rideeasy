@@ -686,6 +686,7 @@ function doSignup(){
 }
 function loginUser(user){
   currentUser=user;
+  localStorage.setItem('rideeasy_user', JSON.stringify(user));
   document.getElementById('authOverlay').classList.add('hidden');
   document.getElementById('navAvatar').textContent=user.name[0].toUpperCase();
   document.getElementById('navName').textContent=user.name;
@@ -699,6 +700,7 @@ function doLogout(){
   currentUser=null;
   authToken=null;
   localStorage.removeItem('rideeasy_token');
+  localStorage.removeItem('rideeasy_user');
   document.getElementById('authOverlay').classList.remove('hidden');
   document.getElementById('ownerTab').style.display='none';
   document.getElementById('navAvatar').textContent='?';
@@ -1393,6 +1395,20 @@ function loadTheme(){
 async function init() {
   loadTheme();
   renderList(); renderDashboard(); renderPhotos();
+
+  // Auto-restore session from localStorage
+  const savedUser = localStorage.getItem('rideeasy_user');
+  if(savedUser){
+    try {
+      const user = JSON.parse(savedUser);
+      if(user && user.name && user.email){
+        loginUser(user);
+        return; // skip showing auth overlay
+      }
+    } catch(e) {
+      localStorage.removeItem('rideeasy_user');
+    }
+  }
 
   // Load vehicles from API in background (non-blocking)
   try {
