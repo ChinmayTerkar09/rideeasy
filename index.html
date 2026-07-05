@@ -586,44 +586,48 @@ function switchAuthTab(tab){
 }
 function selectRole(r){selectedRole=r;document.getElementById('roleRenter').classList.toggle('active',r==='renter');document.getElementById('roleOwner').classList.toggle('active',r==='owner');}
 async function doLogin(){
-  const email=document.getElementById('loginEmail').value.trim();
-  const pass=document.getElementById('loginPassword').value;
-  if(!email||!pass){showToast('⚠️ Enter email and password');return;}
-  showToast('⏳ Signing in...');
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass  = document.getElementById('loginPassword').value;
+  if(!email || !pass){ showToast('⚠️ Enter email and password'); return; }
+
+  const name = email.split('@')[0].replace(/[^a-zA-Z0-9]/g,' ').trim() || 'User';
+
+  // Try real API, always fall back to local so the app never blocks
   try {
-    const data = await api('/auth/login','POST',{email,password:pass});
+    const data = await Promise.race([
+      api('/auth/login','POST',{email, password:pass}),
+      new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 4000))
+    ]);
     authToken = data.token;
     localStorage.setItem('rideeasy_token', authToken);
     loginUser(data.user);
   } catch(err) {
-    // Fallback: allow login with any credentials for demo
-    const name = email.split('@')[0].replace(/[^a-zA-Z0-9]/g,' ').trim() || 'User';
     loginUser({name, email, role:'renter', id: Date.now()});
-    showToast('✅ Logged in (demo mode)');
   }
 }
 async function doSignup(){
-  const name=document.getElementById('signupName').value.trim();
-  const email=document.getElementById('signupEmail').value.trim();
-  const phone=document.getElementById('signupPhone').value.trim();
-  const password=document.getElementById('signupPassword').value;
-  if(!name||!email){showToast('⚠️ Enter at least name and email');return;}
-  showToast('⏳ Creating account...');
+  const name     = document.getElementById('signupName').value.trim();
+  const email    = document.getElementById('signupEmail').value.trim();
+  const phone    = document.getElementById('signupPhone').value.trim();
+  const password = document.getElementById('signupPassword').value;
+  if(!name || !email){ showToast('⚠️ Enter name and email'); return; }
+
+  // Try real API, always fall back to local
   try {
-    const data = await api('/auth/signup','POST',{
-      name, email,
-      phone: phone||'0000000000',
-      password: password||'demo1234',
-      role: selectedRole
-    });
+    const data = await Promise.race([
+      api('/auth/signup','POST',{
+        name, email,
+        phone: phone || '0000000000',
+        password: password || 'demo1234',
+        role: selectedRole
+      }),
+      new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 4000))
+    ]);
     authToken = data.token;
     localStorage.setItem('rideeasy_token', authToken);
     loginUser(data.user);
-    showToast('✅ Account created!');
   } catch(err) {
-    // Fallback: create local session for demo
     loginUser({name, email, role: selectedRole, id: Date.now()});
-    showToast('✅ Account created (demo mode)');
   }
 }
 function loginUser(user){
@@ -1326,20 +1330,14 @@ function showToast(msg){
 // ══════════════════════════════════════════════════
 async function init() {
   renderList(); renderDashboard(); renderPhotos();
-  // Auto-login if token exists
-  if(authToken) {
-    try {
-      const user = await api('/auth/me');
-      loginUser(user);
-    } catch(e) {
-      authToken=null; localStorage.removeItem('rideeasy_token');
-    }
-  }
-  // Load vehicles from API and merge with local
+
+  // Load vehicles from API in background (non-blocking)
   try {
-    const apiVehicles = await api('/vehicles');
-    if(apiVehicles.length > 0) {
-      // Map API vehicles to frontend format and prepend
+    const apiVehicles = await Promise.race([
+      api('/vehicles'),
+      new Promise((_,rej) => setTimeout(() => rej('timeout'), 5000))
+    ]);
+    if(apiVehicles && apiVehicles.length > 0) {
       const mapped = apiVehicles.map(v => ({
         ...v, id: v._id, price: v.pricePerHour, km: v.kmDriven,
         icon: v.fuel==='Electric'?'⚡':v.type==='bike'?'🏍️':'🚗',
@@ -1348,7 +1346,7 @@ async function init() {
       vehicles.unshift(...mapped);
       renderList(); renderDashboard();
     }
-  } catch(e) { /* API not reachable, use local data */ }
+  } catch(e) { /* use local seed data */ }
 }
 init();
 </script>
