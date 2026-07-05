@@ -49,6 +49,8 @@ nav{position:sticky;top:0;z-index:200;background:var(--asphalt);display:flex;ali
 .nav-name{font-size:0.8rem;color:rgba(255,255,255,0.7);max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .logout-btn{background:none;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);padding:5px 10px;border-radius:7px;font-family:inherit;font-size:0.75rem;cursor:pointer;transition:all 0.2s;}
 .logout-btn:hover{border-color:var(--danger);color:var(--danger);}
+.theme-toggle{background:none;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.8);width:32px;height:32px;border-radius:8px;font-size:0.95rem;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;justify-content:center;}
+.theme-toggle:hover{background:rgba(255,255,255,0.1);border-color:var(--speed);}
 
 /* ── LAYOUT ── */
 .app{display:flex;height:calc(100vh - 60px);}
@@ -333,6 +335,7 @@ canvas{display:block;}
     <button class="nav-tab" id="ownerTab" onclick="showPage('owner')" style="display:none;">🔑 My Fleet</button>
   </div>
   <div class="nav-user">
+    <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle dark/light mode">🌙</button>
     <div class="nav-avatar" id="navAvatar">?</div>
     <div class="nav-name" id="navName">Guest</div>
     <button class="logout-btn" onclick="doLogout()">Logout</button>
@@ -1300,9 +1303,27 @@ function showToast(msg){
 }
 
 // ══════════════════════════════════════════════════
+// THEME
+// ══════════════════════════════════════════════════
+function toggleTheme(){
+  const isDark = document.body.classList.toggle('dark');
+  document.getElementById('themeToggle').textContent = isDark ? '☀️' : '🌙';
+  localStorage.setItem('rideeasy_theme', isDark ? 'dark' : 'light');
+}
+
+function loadTheme(){
+  const saved = localStorage.getItem('rideeasy_theme');
+  if(saved === 'dark'){
+    document.body.classList.add('dark');
+    document.getElementById('themeToggle').textContent = '☀️';
+  }
+}
+
+// ══════════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════════
 async function init() {
+  loadTheme();
   renderList(); renderDashboard(); renderPhotos();
 
   // Load vehicles from API in background (non-blocking)
