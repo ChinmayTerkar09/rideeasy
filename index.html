@@ -290,6 +290,74 @@ canvas{display:block;}
 ::-webkit-scrollbar{width:5px;}
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:10px;}
+
+  /* ── DARK MODE ── */
+  body.dark { background:var(--paper); color:var(--ink); }
+  body.dark, body.dark * { transition: background-color 0.3s, color 0.3s, border-color 0.3s; }
+
+  body.dark { --ink:#e8e8f0; --paper:#0f0f17; --asphalt:#07070f; --speed:#e8ff3c; --muted:#8888aa; --card:#16161f; --border:#2a2a3e; --sh:0 2px 20px rgba(0,0,0,0.5); }
+
+  body.dark nav { background:#07070f; border-bottom:1px solid #2a2a3e; }
+  body.dark .sidebar { background:#16161f; border-right:1px solid #2a2a3e; }
+  body.dark .sidebar-header { border-bottom:1px solid #2a2a3e; }
+  body.dark .search-wrap input { background:#1e1e2e; border-color:#2a2a3e; color:#e8e8f0; }
+  body.dark .search-wrap input::placeholder { color:#8888aa; }
+  body.dark .vehicle-card { background:#16161f; border-color:#2a2a3e; }
+  body.dark .vehicle-card:hover { border-color:#4a4a6e; }
+  body.dark .vehicle-card.selected { border-color:#e8ff3c; box-shadow:0 0 0 3px rgba(232,255,60,0.1); }
+  body.dark .auth-overlay { background:#07070f; }
+  body.dark .auth-box { background:#16161f; border:1px solid #2a2a3e; }
+  body.dark .auth-form input { background:#1e1e2e; border-color:#2a2a3e; color:#e8e8f0; }
+  body.dark .auth-form input::placeholder { color:#8888aa; }
+  body.dark .auth-tabs { border-color:#2a2a3e; }
+  body.dark .auth-tab { color:#8888aa; background:#1e1e2e; }
+  body.dark .auth-tab.active { background:#e8ff3c; color:#0f0f17; }
+  body.dark .role-btn { border-color:#2a2a3e; color:#8888aa; background:#1e1e2e; }
+  body.dark .role-btn.active { border-color:#e8ff3c; color:#e8ff3c; background:rgba(232,255,60,0.08); }
+  body.dark .page { background:#0f0f17; }
+  body.dark .stat-card { background:#16161f; border-color:#2a2a3e; }
+  body.dark .chart-card { background:#16161f; border-color:#2a2a3e; }
+  body.dark .rentals-table { background:#16161f; border-color:#2a2a3e; }
+  body.dark .rentals-table td { border-color:#2a2a3e; color:#e8e8f0; }
+  body.dark .rentals-table tr:hover td { background:rgba(255,255,255,0.03); }
+  body.dark .form-group input, body.dark .form-group select, body.dark .form-group textarea { background:#1e1e2e; border-color:#2a2a3e; color:#e8e8f0; }
+  body.dark .form-group label { color:#8888aa; }
+  body.dark .booking-form-grid { color:#e8e8f0; }
+  body.dark .payment-section { border-color:#2a2a3e; background:#16161f; }
+  body.dark .pay-header { background:#1e1e2e; border-color:#2a2a3e; color:#e8e8f0; }
+  body.dark .pay-method { background:#1e1e2e; border-color:#2a2a3e; color:#8888aa; }
+  body.dark .pay-method.active { background:#e8ff3c; color:#0f0f17; border-color:#e8ff3c; }
+  body.dark .reviews-section { background:#16161f; border-color:#2a2a3e; }
+  body.dark .review-item { background:#1e1e2e; }
+  body.dark .review-text { color:#aaaacc; }
+  body.dark .review-form textarea { background:#1e1e2e; border-color:#2a2a3e; color:#e8e8f0; }
+  body.dark .photo-upload-area { border-color:#2a2a3e; background:#1e1e2e; }
+  body.dark .photo-slot { border-color:#2a2a3e; }
+  body.dark .photo-thumb { border-color:#2a2a3e; }
+  body.dark .ai-pricing-card { border-color:#2a2a3e; }
+  body.dark .ai-pricing-body { background:#16161f; }
+  body.dark .price-tier { border-color:#2a2a3e; background:#1e1e2e; }
+  body.dark .price-tier.recommended { border-color:#e8ff3c; background:rgba(232,255,60,0.06); }
+  body.dark .price-reasoning { background:#1e1e2e; }
+  body.dark .filter-btn { border-color:#2a2a3e; color:#8888aa; background:#1e1e2e; }
+  body.dark .chat-popup { background:#16161f; border-color:#2a2a3e; }
+  body.dark .popup-messages { background:#0f0f17; }
+  body.dark .pmsg.bot .pmsg-bubble { background:#1e1e2e; border-color:#2a2a3e; color:#e8e8f0; }
+  body.dark .pqr-btn { background:#1e1e2e; border-color:#2a2a3e; color:#e8e8f0; }
+  body.dark .pqr-btn:hover { background:#e8ff3c; color:#0f0f17; border-color:#e8ff3c; }
+  body.dark .popup-input-row { background:#16161f; border-color:#2a2a3e; }
+  body.dark .popup-input-row input { background:#1e1e2e; border-color:#2a2a3e; color:#e8e8f0; }
+  body.dark .modal-box { background:#16161f; border:1px solid #2a2a3e; }
+  body.dark .modal-btn.secondary { background:#1e1e2e; border-color:#2a2a3e; color:#8888aa; }
+  body.dark .owner-v-card { background:#16161f; border-color:#2a2a3e; }
+  body.dark .reg-grid .form-group input,
+  body.dark .reg-grid .form-group select,
+  body.dark .reg-grid .form-group textarea { background:#1e1e2e; border-color:#2a2a3e; color:#e8e8f0; }
+  body.dark .vc-name { color:#e8e8f0; }
+  body.dark .map-placeholder { border-color:#2a2a3e; }
+  body.dark .razorpay-note { background:rgba(74,144,217,0.1); }
+  body.dark code { background:#1e1e2e; color:#8888aa; }
+
 </style>
 </head>
 <body>
