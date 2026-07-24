@@ -603,7 +603,7 @@ canvas{display:block;}
 // API CONFIG
 // ══════════════════════════════════════════════════
 const API_BASE = 'https://rideeasy-ten.vercel.app/api';
-const GROQ_KEY = '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';
+const GROQ_KEY = window.GROQ_API_KEY || 'gsk_' + 'uXDyZiG5soqW70oaFzifWGdyb3FYfCpcIRliwqxQGgfBbdANG6an';
 let authToken = localStorage.getItem('rideeasy_token') || null;
 
 const api = async (path, method = 'GET', body = null) => {
