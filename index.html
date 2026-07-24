@@ -603,6 +603,7 @@ canvas{display:block;}
 // API CONFIG
 // ══════════════════════════════════════════════════
 const API_BASE = 'https://rideeasy-ten.vercel.app/api';
+const GROQ_KEY = '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';
 let authToken = localStorage.getItem('rideeasy_token') || null;
 
 const api = async (path, method = 'GET', body = null) => {
@@ -1168,9 +1169,9 @@ Indian market rates: bikes ₹5-30/hr, cars ₹40-150/hr. Factor in age deprecia
 Respond ONLY with valid JSON, no markdown:
 {"budget":<number>,"recommended":<number>,"premium":<number>,"reasoning":"<2-3 sentences>"}`;
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:400,messages:[{role:'user',content:prompt}]})});
+    const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+GROQ_KEY},body:JSON.stringify({model:'llama-3.3-70b-versatile',max_tokens:400,messages:[{role:'system',content:'You are a vehicle rental pricing expert for India. Return only valid JSON, no markdown.'},{role:'user',content:prompt}]})});
     const data=await res.json();
-    const parsed=JSON.parse(data.content?.[0]?.text.replace(/```json|```/g,'').trim()||'{}');
+    const parsed=JSON.parse((data.choices?.[0]?.message?.content||'{}').replace(/```json|```/g,'').trim());
     document.getElementById('priceMin').textContent='₹'+parsed.budget;
     document.getElementById('priceRec').textContent='₹'+parsed.recommended;
     document.getElementById('priceMax').textContent='₹'+parsed.premium;
@@ -1305,18 +1306,19 @@ INSTRUCTIONS:
   if(chatHistory.length > 6) chatHistory = chatHistory.slice(-6);
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'anthropic-dangerous-direct-browser-ipc': 'true',
-        'anthropic-version': '2023-06-01'
+        'Authorization': 'Bearer ' + GROQ_KEY
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
+        model: 'llama-3.3-70b-versatile',
         max_tokens: 250,
-        system: systemPrompt,
-        messages: chatHistory.slice()
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...chatHistory.slice()
+        ]
       })
     });
     const data = await res.json();
@@ -1327,8 +1329,7 @@ INSTRUCTIONS:
       popupAddBot("Sorry, something went wrong. Try again! 😅", ['Try again']);
       return;
     }
-
-    const reply = data.content?.[0]?.text || "I'm not sure about that. Try asking differently!";
+    const reply = data.choices?.[0]?.message?.content || "I'm not sure about that. Try asking differently!";
     chatHistory.push({role:'assistant', content: reply});
 
     // Context-aware quick replies - never repeat what was just asked
